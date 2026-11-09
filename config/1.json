@@ -1,0 +1,40 @@
+{
+  "name": "1",
+  "created_time": "2025-09-12 06:58:42",
+  "vibration_mapper_params": {
+    "low_freq_sensitivity": 0.6978962131837306,
+    "high_freq_sensitivity": 1.9953716690042078,
+    "overall_intensity": 0.6002805049088359,
+    "min_volume_threshold": 0.03,
+    "max_volume_threshold": 1.0,
+    "min_low_freq_threshold": 0.1999651810584958,
+    "min_high_freq_threshold": 0.13596239554317546,
+    "min_vibration_intensity": 0.0,
+    "max_vibration_intensity": 1.0,
+    "smoothing_factor": 1.0,
+    "attack_time": 0.1,
+    "decay_time": 0.5,
+    "frequency_cutoff": 400,
+    "frequency_difference_factor": 0.6980874316939891
+  },
+  "sound_classification": {
+    "enabled": false,
+    "explosion_boost": 2.5,
+    "metal_boost": 2.0,
+    "explosion_threshold": 0.3,
+    "metal_threshold": 0.25
+  },
+  "impact_enhancement": {
+    "enabled": false,
+    "multiplier": 3.0,
+    "duration": 0.15,
+    "energy_threshold": 5.0
+  },
+  "advanced_settings": {
+    "frequency_difference_factor": 0.6980874316939891,
+    "min_low_freq_threshold": 0.1999651810584958,
+    "min_high_freq_threshold": 0.13596239554317546,
+    "min_volume_threshold": 0.03,
+    "max_volume_threshold": 1.0
+  }
+}

@@ -1,0 +1,9 @@
+XInput-Python>=0.4.0
+pyaudio>=0.2.11
+numpy>=1.21.0
+scipy>=1.7.0
+tkinter
+matplotlib>=3.5.0
+threading
+queue
+psutil>=5.8.0

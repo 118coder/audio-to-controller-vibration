@@ -1,0 +1,40 @@
+{
+  "name": "电影观看",
+  "created_time": "2025-01-08 12:35:00",
+  "vibration_mapper_params": {
+    "low_freq_sensitivity": 1.5,
+    "high_freq_sensitivity": 1.0,
+    "overall_intensity": 0.8,
+    "smoothing_factor": 0.3,
+    "attack_time": 0.15,
+    "decay_time": 0.8,
+    "frequency_cutoff": 200,
+    "frequency_difference_factor": 0.4,
+    "min_low_freq_threshold": 0.2,
+    "min_high_freq_threshold": 0.1,
+    "min_volume_threshold": 0.05,
+    "max_volume_threshold": 1.0,
+    "min_vibration_intensity": 0.0,
+    "max_vibration_intensity": 1.0
+  },
+  "sound_classification": {
+    "enabled": true,
+    "explosion_boost": 2.0,
+    "metal_boost": 1.5,
+    "explosion_threshold": 0.7,
+    "metal_threshold": 0.5
+  },
+  "impact_enhancement": {
+    "enabled": false,
+    "multiplier": 2.5,
+    "duration": 0.2,
+    "energy_threshold": 2.0
+  },
+  "advanced_settings": {
+    "frequency_difference_factor": 0.4,
+    "min_low_freq_threshold": 0.2,
+    "min_high_freq_threshold": 0.1,
+    "min_volume_threshold": 0.05,
+    "max_volume_threshold": 1.0
+  }
+}

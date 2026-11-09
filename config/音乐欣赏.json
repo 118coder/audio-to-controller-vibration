@@ -1,0 +1,40 @@
+{
+  "name": "音乐欣赏",
+  "created_time": "2025-01-08 12:40:00",
+  "vibration_mapper_params": {
+    "low_freq_sensitivity": 1.0,
+    "high_freq_sensitivity": 3.0,
+    "overall_intensity": 0.6,
+    "smoothing_factor": 0.5,
+    "attack_time": 0.1,
+    "decay_time": 0.6,
+    "frequency_cutoff": 500,
+    "frequency_difference_factor": 0.2,
+    "min_low_freq_threshold": 0.3,
+    "min_high_freq_threshold": 0.15,
+    "min_volume_threshold": 0.08,
+    "max_volume_threshold": 0.8,
+    "min_vibration_intensity": 0.0,
+    "max_vibration_intensity": 1.0
+  },
+  "sound_classification": {
+    "enabled": false,
+    "explosion_boost": 2.5,
+    "metal_boost": 2.0,
+    "explosion_threshold": 0.6,
+    "metal_threshold": 0.4
+  },
+  "impact_enhancement": {
+    "enabled": false,
+    "multiplier": 2.0,
+    "duration": 0.25,
+    "energy_threshold": 3.0
+  },
+  "advanced_settings": {
+    "frequency_difference_factor": 0.2,
+    "min_low_freq_threshold": 0.3,
+    "min_high_freq_threshold": 0.15,
+    "min_volume_threshold": 0.08,
+    "max_volume_threshold": 0.8
+  }
+}

@@ -1,0 +1,41 @@
+{
+  "vibration_mapper_params": {
+    "low_freq_sensitivity": 1.0,
+    "high_freq_sensitivity": 2.5,
+    "overall_intensity": 1.0,
+    "min_volume_threshold": 0.03,
+    "max_volume_threshold": 1.0,
+    "min_low_freq_threshold": 0.15,
+    "min_high_freq_threshold": 0.05,
+    "min_vibration_intensity": 0.0,
+    "max_vibration_intensity": 1.0,
+    "smoothing_factor": 0.0,
+    "attack_time": 0.01,
+    "decay_time": 0.1,
+    "frequency_cutoff": 400,
+    "frequency_difference_factor": 1.0
+  },
+  "sound_classification": {
+    "enabled": false,
+    "explosion_boost": 2.5,
+    "metal_boost": 2.0,
+    "explosion_threshold": 0.3,
+    "metal_threshold": 0.25
+  },
+  "impact_enhancement": {
+    "enabled": false,
+    "multiplier": 3.0,
+    "duration": 0.15,
+    "energy_threshold": 5.0
+  },
+  "advanced_settings": {
+    "frequency_difference_factor": 1.0,
+    "min_low_freq_threshold": 0.15,
+    "min_high_freq_threshold": 0.05,
+    "min_volume_threshold": 0.03,
+    "max_volume_threshold": 1.0
+  },
+  "gui_params": {
+    "preset": "balanced"
+  }
+}

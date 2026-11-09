@@ -1,0 +1,40 @@
+{
+  "name": "游戏专用",
+  "created_time": "2025-01-08 12:30:00",
+  "vibration_mapper_params": {
+    "low_freq_sensitivity": 1.2,
+    "high_freq_sensitivity": 1.2,
+    "overall_intensity": 1.0,
+    "smoothing_factor": 0.0,
+    "attack_time": 0.05,
+    "decay_time": 0.2,
+    "frequency_cutoff": 300,
+    "frequency_difference_factor": 0.8,
+    "min_low_freq_threshold": 0.1,
+    "min_high_freq_threshold": 0.05,
+    "min_volume_threshold": 0.02,
+    "max_volume_threshold": 1.0,
+    "min_vibration_intensity": 0.0,
+    "max_vibration_intensity": 1.0
+  },
+  "sound_classification": {
+    "enabled": true,
+    "explosion_boost": 3.0,
+    "metal_boost": 2.5,
+    "explosion_threshold": 0.5,
+    "metal_threshold": 0.3
+  },
+  "impact_enhancement": {
+    "enabled": true,
+    "multiplier": 4.0,
+    "duration": 0.1,
+    "energy_threshold": 1.2
+  },
+  "advanced_settings": {
+    "frequency_difference_factor": 0.8,
+    "min_low_freq_threshold": 0.1,
+    "min_high_freq_threshold": 0.05,
+    "min_volume_threshold": 0.02,
+    "max_volume_threshold": 1.0
+  }
+}
