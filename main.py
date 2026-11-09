@@ -11,6 +11,34 @@ import argparse
 import traceback
 from pathlib import Path
 
+# --- 打包为无控制台 exe (--windowed) 时，sys.stdout / sys.stderr 为 None，
+# --- 任何 print() 都会抛 AttributeError 导致程序秒退。这里做兜底。
+if sys.stdout is None:
+    sys.stdout = open(os.devnull, "w", encoding="utf-8")
+if sys.stderr is None:
+    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+
+
+def _app_dir():
+    """程序所在目录（打包后为 exe 目录，源码运行为脚本目录）"""
+    if getattr(sys, "frozen", False):
+        return os.path.dirname(os.path.abspath(sys.executable))
+    return os.path.dirname(os.path.abspath(__file__))
+
+
+def _log_crash(exc_tb):
+    """崩溃时把堆栈写到 exe 同目录，方便排查（窗口版看不到控制台）"""
+    try:
+        import traceback as _tb
+        log_path = os.path.join(_app_dir(), "AudioVibration_crash.log")
+        with open(log_path, "w", encoding="utf-8") as f:
+            f.write("AudioVibration 崩溃日志\n")
+            f.write("=" * 60 + "\n")
+            _tb.print_exception(exc_tb[0], exc_tb[1], exc_tb[2], file=f)
+    except Exception:
+        pass
+
+
 # 添加当前目录到Python路径
 current_dir = Path(__file__).parent
 sys.path.insert(0, str(current_dir))
@@ -482,4 +510,17 @@ def main():
         return 1
 
 if __name__ == "__main__":
-    sys.exit(main())
+    # 打包后统一以 exe 所在目录为工作目录，保证 config/ 等相对路径可用
+    if getattr(sys, "frozen", False):
+        try:
+            os.chdir(_app_dir())
+        except Exception:
+            pass
+    try:
+        _exit_code = main()
+    except SystemExit:
+        raise
+    except BaseException:
+        _log_crash(sys.exc_info())
+        sys.exit(1)
+    sys.exit(_exit_code)
