@@ -24,10 +24,19 @@ def _app_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _has_console():
+    """当前进程是否挂着一个控制台窗口"""
+    try:
+        import ctypes
+        return ctypes.windll.kernel32.GetConsoleWindow() != 0
+    except Exception:
+        return True
+
+
 def _ensure_output_streams():
-    """保证 stdout/stderr 存在且不会因编码问题抛异常"""
-    log_stream = None
-    if sys.stdout is None or sys.stderr is None:
+    """无控制台（窗口版）时把 stdout/stderr 落到日志文件，保证异常可追溯"""
+    force_file = getattr(sys, "frozen", False) and not _has_console()
+    if force_file or sys.stdout is None or sys.stderr is None:
         try:
             log_stream = open(
                 os.path.join(_app_dir(), "AudioVibration_run.log"),
@@ -39,11 +48,18 @@ def _ensure_output_streams():
                 os.path.join(tempfile.gettempdir(), "AudioVibration_run.log"),
                 "w", encoding="utf-8", errors="replace", buffering=1,
             )
-    for name in ("stdout", "stderr"):
-        stream = getattr(sys, name, None)
-        if stream is None:
-            setattr(sys, name, log_stream)
-        else:
+        sys.stdout = log_stream
+        sys.stderr = log_stream
+        sys.__stdout__ = sys.__stdout__ or log_stream
+        sys.__stderr__ = sys.__stderr__ or log_stream
+        try:
+            import faulthandler
+            faulthandler.enable(file=log_stream, all_threads=True)
+        except Exception:
+            pass
+    else:
+        for name in ("stdout", "stderr"):
+            stream = getattr(sys, name, None)
             try:
                 stream.reconfigure(errors="replace")
             except Exception:
@@ -64,6 +80,20 @@ def _log_crash(exc_tb):
             _tb.print_exception(exc_tb[0], exc_tb[1], exc_tb[2], file=f)
     except Exception:
         pass
+
+
+def _install_excepthook():
+    """未捕获异常统一落盘到 AudioVibration_crash.log"""
+    def _hook(exc_type, exc, tb):
+        _log_crash((exc_type, exc, tb))
+        try:
+            traceback.print_exception(exc_type, exc, tb)
+        except Exception:
+            pass
+    sys.excepthook = _hook
+
+
+_install_excepthook()
 
 
 
