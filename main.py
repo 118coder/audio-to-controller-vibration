@@ -11,12 +11,10 @@ import argparse
 import traceback
 from pathlib import Path
 
-# --- 打包为无控制台 exe (--windowed) 时，sys.stdout / sys.stderr 为 None，
-# --- 任何 print() 都会抛 AttributeError 导致程序秒退。这里做兜底。
-if sys.stdout is None:
-    sys.stdout = open(os.devnull, "w", encoding="utf-8")
-if sys.stderr is None:
-    sys.stderr = open(os.devnull, "w", encoding="utf-8")
+# --- 打包为无控制台 exe (--windowed) 时 sys.stdout/sys.stderr 为 None，任何 print()
+# --- 都会抛 AttributeError 导致程序秒退；中文控制台 (GBK) 打印 ⚠ 等字符又会
+# --- 抛 UnicodeEncodeError。两种情况下异常都可能被上层 try 吞掉，表现为"无提示秒退"。
+# --- 这里统一兜底：窗口版输出写入 exe 同目录的运行日志，控制台版改为不崩的替换编码。
 
 
 def _app_dir():
@@ -26,17 +24,47 @@ def _app_dir():
     return os.path.dirname(os.path.abspath(__file__))
 
 
+def _ensure_output_streams():
+    """保证 stdout/stderr 存在且不会因编码问题抛异常"""
+    log_stream = None
+    if sys.stdout is None or sys.stderr is None:
+        try:
+            log_stream = open(
+                os.path.join(_app_dir(), "AudioVibration_run.log"),
+                "w", encoding="utf-8", errors="replace", buffering=1,
+            )
+        except Exception:
+            import tempfile
+            log_stream = open(
+                os.path.join(tempfile.gettempdir(), "AudioVibration_run.log"),
+                "w", encoding="utf-8", errors="replace", buffering=1,
+            )
+    for name in ("stdout", "stderr"):
+        stream = getattr(sys, name, None)
+        if stream is None:
+            setattr(sys, name, log_stream)
+        else:
+            try:
+                stream.reconfigure(errors="replace")
+            except Exception:
+                pass
+
+
+_ensure_output_streams()
+
+
 def _log_crash(exc_tb):
     """崩溃时把堆栈写到 exe 同目录，方便排查（窗口版看不到控制台）"""
     try:
         import traceback as _tb
         log_path = os.path.join(_app_dir(), "AudioVibration_crash.log")
-        with open(log_path, "w", encoding="utf-8") as f:
+        with open(log_path, "w", encoding="utf-8", errors="replace") as f:
             f.write("AudioVibration 崩溃日志\n")
             f.write("=" * 60 + "\n")
             _tb.print_exception(exc_tb[0], exc_tb[1], exc_tb[2], file=f)
     except Exception:
         pass
+
 
 
 # 添加当前目录到Python路径
