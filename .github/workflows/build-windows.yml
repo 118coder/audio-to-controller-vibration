@@ -33,7 +33,7 @@ jobs:
           Copy-Item dist/AudioVibration.exe package/
           Copy-Item -Recurse -Force config package/
           Copy-Item default_config.json package/
-          Copy-Item README.md package/
+
           Compress-Archive -Path package/* -DestinationPath AudioVibration_windows.zip -Force
 
       - name: Upload artifact
