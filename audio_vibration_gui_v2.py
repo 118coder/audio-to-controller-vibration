@@ -653,7 +653,9 @@ class AudioVibrationGUIv2:
             for device in devices:
                 display_name = device['name']
                 if device['is_system_audio']:
-                    display_name = f"[系统音频] {display_name}"
+                    tag = "[系统音频]" if device.get('is_loopback') else "[混音/环回]"
+                    suffix = "（当前默认输出）" if device.get('is_default_loopback') else ""
+                    display_name = f"{tag} {display_name}{suffix}"
                     system_audio_count += 1
                 else:
                     display_name = f"[麦克风] {display_name}"
@@ -668,12 +670,12 @@ class AudioVibrationGUIv2:
                         self.device_combo.current(i)
                         self.audio_processor.device_index = device['index']
                         break
-                status_msg = f"已发现 {system_audio_count} 个系统音频设备"
+                status_msg = f"已发现 {system_audio_count} 个系统音频设备（WASAPI环回可直接抓系统播放的声音）"
             else:
                 if devices:
                     self.device_combo.current(0)
                     self.audio_processor.device_index = devices[0]['index']
-                status_msg = "未发现系统音频设备，请启用立体声混音"
+                status_msg = "未发现系统音频设备，请启用立体声混音或改用 WASAPI 环回设备"
             
             self.update_status(status_msg)
             
@@ -707,10 +709,23 @@ class AudioVibrationGUIv2:
     def start_conversion(self):
         """启动音频转换"""
         try:
-            self.audio_processor.start_recording()
+            ok = self.audio_processor.start_recording()
+            if not ok:
+                # 采集没起来就不能装作在跑，否则就是"界面在转、手柄不震"
+                err = getattr(self.audio_processor, 'last_error', None) or "未知原因"
+                self.update_status(f"音频采集启动失败: {err}")
+                messagebox.showerror(
+                    "音频采集失败",
+                    "没能打开音频采集，所以不会有震动。\n\n"
+                    f"原因: {err}\n\n"
+                    "请点【刷新设备】后重新选择，建议选 [系统音频] 开头的设备(WASAPI环回)。"
+                )
+                return
+            
             self.is_running = True
             self.start_button.config(text="停止转换")
-            self.update_status("正在运行音频转震动转换...")
+            kind = "系统音频" if getattr(self.audio_processor, 'capture_is_loopback', False) else "输入设备"
+            self.update_status(f"正在运行音频转震动转换（采集源: {kind}）...")
             
             # 启动处理线程
             self.processing_thread = threading.Thread(target=self.audio_processing_loop, daemon=True)

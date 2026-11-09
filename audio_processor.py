@@ -5,7 +5,15 @@
 实现实时音频采集、频谱分析和信号处理
 """
 
-import pyaudio
+# 优先使用 PyAudioWPatch（PyAudio 的 WASAPI 环回分支）：
+# 它能直接采集"系统正在播放的声音"，不需要用户去启用"立体声混音"虚拟设备。
+try:
+    import pyaudiowpatch as pyaudio
+    HAS_WASAPI_LOOPBACK = True
+except ImportError:
+    import pyaudio
+    HAS_WASAPI_LOOPBACK = False
+
 import numpy as np
 from scipy import signal
 from scipy.fft import fft
@@ -19,9 +27,9 @@ class AudioProcessor:
         初始化音频处理器
         
         Args:
-            sample_rate: 采样率，默认44100Hz
+            sample_rate: 采样率，默认44100Hz（实际会以设备支持值为准）
             chunk_size: 音频块大小，默认1024（减小以降低延迟）
-            device_index: 音频设备索引，None为默认设备
+            device_index: 音频设备索引，None为默认设备（优先取 WASAPI 环回=系统音频）
         """
         self.sample_rate = sample_rate
         self.chunk_size = chunk_size
@@ -31,6 +39,12 @@ class AudioProcessor:
         self.audio = None
         self.stream = None
         self.is_recording = False
+        
+        # 实际采集参数（以成功打开流时为准）
+        self.capture_format = pyaudio.paFloat32
+        self.capture_channels = 1
+        self.capture_is_loopback = False
+        self.last_error = None
         
         # 数据队列 - 减小队列大小以降低延迟
         self.audio_queue = queue.Queue(maxsize=3)
@@ -49,17 +63,24 @@ class AudioProcessor:
             'treble': (6000, 16000)    # 高频：金属声、尖锐音
         }
         
-        # 为每个频段创建滤波器
+        # 为每个频段创建滤波器（采样率变化时会整体重建）
         self.band_filters = {}
-        for band_name, (low_freq, high_freq) in self.frequency_bands.items():
-            self.band_filters[band_name] = self._create_bandpass_filter(low_freq, high_freq)
-        
-        # 保持原有的简单低通/高通滤波器用于兼容
-        self.lowpass_filter = self._create_lowpass_filter(300)  
-        self.highpass_filter = self._create_highpass_filter(300)
+        self.lowpass_filter = None
+        self.highpass_filter = None
+        self._rebuild_filters(self.sample_rate)
         
         # 音量分析窗口
         self.volume_buffer = []
+
+    def _rebuild_filters(self, sample_rate):
+        """按实际采样率重建滤波器（WASAPI 设备常是 48kHz，仍按 44.1kHz 算会切错频段）"""
+        self.sample_rate = int(sample_rate)
+        self.band_filters = {}
+        for band_name, (low_freq, high_freq) in self.frequency_bands.items():
+            self.band_filters[band_name] = self._create_bandpass_filter(low_freq, high_freq)
+        self.lowpass_filter = self._create_lowpass_filter(300)
+        self.highpass_filter = self._create_highpass_filter(300)
+        print(f"✓ 滤波器已按 {self.sample_rate} Hz 重建")
         
         
     def _create_lowpass_filter(self, cutoff_freq):
@@ -93,29 +114,57 @@ class AudioProcessor:
         return (b, a)
     
     def get_audio_devices(self):
-        """获取可用的音频设备列表"""
+        """获取可用的音频设备列表（含 WASAPI 环回 = 真正的系统音频）"""
         if not self.audio:
             self.audio = pyaudio.PyAudio()
         
         devices = []
         for i in range(self.audio.get_device_count()):
-            device_info = self.audio.get_device_info_by_index(i)
-            if device_info['maxInputChannels'] > 0:  # 只显示输入设备
-                device_name = device_info['name']
-                device_type = self._classify_device_type(device_name)
-                
-                devices.append({
-                    'index': i,
-                    'name': device_name,
-                    'type': device_type,
-                    'channels': device_info['maxInputChannels'],
-                    'sample_rate': device_info['defaultSampleRate'],
-                    'is_system_audio': device_type in ['stereo_mix', 'what_you_hear', 'loopback']
-                })
+            try:
+                device_info = self.audio.get_device_info_by_index(i)
+            except Exception:
+                continue
+            if device_info.get('maxInputChannels', 0) <= 0:  # 只显示可采集的设备
+                continue
+            
+            device_name = device_info['name']
+            is_loopback = bool(device_info.get('isLoopbackDevice', False))
+            device_type = 'wasapi_loopback' if is_loopback else self._classify_device_type(device_name)
+            
+            devices.append({
+                'index': i,
+                'name': device_name,
+                'type': device_type,
+                'channels': device_info['maxInputChannels'],
+                'sample_rate': device_info['defaultSampleRate'],
+                'is_system_audio': is_loopback or device_type in ['stereo_mix', 'what_you_hear', 'loopback'],
+                'is_loopback': is_loopback
+            })
         
-        # 按类型排序：系统音频设备在前
-        devices.sort(key=lambda x: (0 if x['is_system_audio'] else 1, x['name']))
-        return devices
+        # 当前默认输出的环回设备（就是用户现在正在听的那个）排最前
+        default_loopback_index = None
+        if HAS_WASAPI_LOOPBACK:
+            try:
+                default_loopback_index = self.audio.get_default_wasapi_loopback()['index']
+            except Exception:
+                default_loopback_index = None
+        for d in devices:
+            d['is_default_loopback'] = (d['index'] == default_loopback_index)
+
+        devices.sort(key=lambda x: (
+            0 if x['index'] == default_loopback_index else (1 if x['is_system_audio'] else 2),
+            x['name']
+        ))
+        
+        # 去重：同一设备会被不同 Host API（MME/DirectSound/WASAPI）重复列出，只留第一个
+        seen, unique_devices = set(), []
+        for d in devices:
+            key = (d['name'].strip().lower(), d['is_loopback'])
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_devices.append(d)
+        return unique_devices
     
     def _classify_device_type(self, device_name):
         """分类设备类型"""
@@ -150,8 +199,37 @@ class AudioProcessor:
         
         return 'unknown'
     
+    def _resolve_capture_device(self):
+        """确定要采集的设备信息；None 时优先用 WASAPI 环回（= 系统正在播放的声音）"""
+        info = None
+        device_index = self.device_index
+        
+        if device_index is None:
+            if HAS_WASAPI_LOOPBACK:
+                try:
+                    lb = self.audio.get_default_wasapi_loopback()
+                    if lb:
+                        device_index = lb['index']
+                        info = lb
+                        print(f"未指定设备，自动使用系统音频(WASAPI环回): {lb.get('name')}")
+                except Exception as e:
+                    print(f"获取默认 WASAPI 环回设备失败: {e}")
+            if device_index is None:
+                try:
+                    info = self.audio.get_default_input_device_info()
+                    device_index = int(info['index'])
+                except Exception:
+                    info = None
+        else:
+            try:
+                info = self.audio.get_device_info_by_index(device_index)
+            except Exception:
+                info = None
+        
+        return device_index, info
+    
     def start_recording(self, callback=None):
-        """开始音频录制"""
+        """开始音频录制（自动匹配设备真正支持的通道数/采样率/格式）"""
         if self.is_recording:
             return False
         
@@ -159,21 +237,66 @@ class AudioProcessor:
             if not self.audio:
                 self.audio = pyaudio.PyAudio()
             
-            self.stream = self.audio.open(
-                format=pyaudio.paFloat32,
-                channels=1,
-                rate=self.sample_rate,
-                input=True,
-                input_device_index=self.device_index,
-                frames_per_buffer=self.chunk_size,
-                stream_callback=self._audio_callback if callback is None else callback
-            )
+            device_index, info = self._resolve_capture_device()
+            is_loopback = bool(info.get('isLoopbackDevice', False)) if info else False
             
-            self.stream.start_stream()
-            self.is_recording = True
-            return True
+            # WASAPI 环回设备必须用它的原生通道数（一般 2），普通输入按单声道采集
+            max_ch = int(info.get('maxInputChannels', 1) or 1) if info else 1
+            channels = min(2, max_ch) if is_loopback else 1
+            device_rate = int(round(info.get('defaultSampleRate', self.sample_rate))) if info else int(self.sample_rate)
+            
+            # 依次尝试，参数不被支持就换下一组（PortAudio 对格式/采样率很挑）
+            candidate_params = []
+            for rate in (device_rate, int(self.sample_rate)):
+                for fmt in (pyaudio.paFloat32, pyaudio.paInt16):
+                    for ch in (channels, 1):
+                        candidate_params.append((fmt, ch, rate))
+            seen, attempts = set(), []
+            for params in candidate_params:
+                if params in seen:
+                    continue
+                seen.add(params)
+                attempts.append(params)
+            
+            last_err = None
+            for fmt, ch, rate in attempts:
+                try:
+                    stream = self.audio.open(
+                        format=fmt,
+                        channels=ch,
+                        rate=rate,
+                        input=True,
+                        input_device_index=device_index,
+                        frames_per_buffer=self.chunk_size,
+                        stream_callback=self._audio_callback if callback is None else callback
+                    )
+                except Exception as e:
+                    last_err = e
+                    continue
+                
+                self.stream = stream
+                self.capture_format = fmt
+                self.capture_channels = ch
+                self.capture_is_loopback = is_loopback
+                self.device_index = device_index
+                if rate != self.sample_rate:
+                    self._rebuild_filters(rate)
+                try:
+                    self.stream.start_stream()
+                except Exception:
+                    pass
+                self.is_recording = True
+                kind = "系统音频(WASAPI环回)" if is_loopback else "输入设备"
+                print(f"✓ 开始采集 [{kind}] {info.get('name') if info else device_index}: "
+                      f"{ch}ch @ {rate}Hz {'float32' if fmt == pyaudio.paFloat32 else 'int16'}")
+                return True
+            
+            self.last_error = str(last_err)
+            print(f"启动音频录制失败（已尝试 {len(attempts)} 组参数）: {last_err}")
+            return False
             
         except Exception as e:
+            self.last_error = str(e)
             print(f"启动音频录制失败: {e}")
             return False
     
@@ -194,14 +317,22 @@ class AudioProcessor:
             self.audio = None
     
     def _audio_callback(self, in_data, frame_count, time_info, status):
-        """音频回调函数"""
+        """音频回调函数（处理 int16→float32、多声道混成单声道）"""
         if status:
             print(f"音频状态: {status}")
         
         try:
-            # 将音频数据添加到队列
-            audio_data = np.frombuffer(in_data, dtype=np.float32)
-            # 标准模式
+            if self.capture_format == pyaudio.paInt16:
+                audio_data = np.frombuffer(in_data, dtype=np.int16).astype(np.float32) / 32768.0
+            else:
+                audio_data = np.frombuffer(in_data, dtype=np.float32)
+            
+            # WASAPI 环回一般是双声道交错数据，取平均降成单声道
+            if self.capture_channels > 1:
+                usable = (len(audio_data) // self.capture_channels) * self.capture_channels
+                if usable > 0:
+                    audio_data = audio_data[:usable].reshape(-1, self.capture_channels).mean(axis=1)
+            
             if not self.audio_queue.full():
                 self.audio_queue.put(audio_data)
         except Exception as e:

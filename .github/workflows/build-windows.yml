@@ -23,15 +23,15 @@ jobs:
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install XInput-Python pyaudio numpy scipy matplotlib psutil pyinstaller
+          pip install XInput-Python PyAudioWPatch numpy scipy matplotlib psutil pyinstaller
 
       - name: Build windowed exe
         run: |
-          pyinstaller --noconfirm --clean --onefile --windowed --name AudioVibration main.py
+          pyinstaller --noconfirm --clean --onefile --windowed --collect-all pyaudiowpatch --name AudioVibration main.py
 
       - name: Build console exe (diagnostics)
         run: |
-          pyinstaller --noconfirm --onefile --console --name AudioVibration_console main.py
+          pyinstaller --noconfirm --onefile --console --collect-all pyaudiowpatch --name AudioVibration_console main.py
 
       - name: Package
         shell: pwsh

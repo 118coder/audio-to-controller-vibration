@@ -1,9 +1,9 @@
+# 运行依赖（tkinter / threading / queue 是 Python 标准库，不能也不需要 pip 安装）
 XInput-Python>=0.4.0
-pyaudio>=0.2.11
+# PyAudioWPatch = PyAudio 的 WASAPI 环回分支，可直接采集系统播放的音频，
+# 不需要用户手动启用"立体声混音"。安装失败时代码会自动回落到普通 pyaudio。
+PyAudioWPatch>=0.2.12.6
 numpy>=1.21.0
 scipy>=1.7.0
-tkinter
 matplotlib>=3.5.0
-threading
-queue
 psutil>=5.8.0

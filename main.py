@@ -115,7 +115,7 @@ def check_dependencies():
     """检查必需的依赖库"""
     required_packages = {
         'XInput': 'XInput-Python',
-        'pyaudio': 'pyaudio',
+        'audio': 'PyAudioWPatch (或 pyaudio)',
         'numpy': 'numpy',
         'scipy': 'scipy',
         'matplotlib': 'matplotlib',
@@ -128,6 +128,12 @@ def check_dependencies():
         try:
             if package == 'tkinter':
                 import tkinter
+            elif package == 'audio':
+                # 优先 WASAPI 环回版本，缺失则回落普通 pyaudio
+                try:
+                    import pyaudiowpatch  # noqa: F401
+                except ImportError:
+                    import pyaudio  # noqa: F401
             else:
                 __import__(package)
         except ImportError:
@@ -221,7 +227,7 @@ def list_audio_devices():
         for device in devices:
             device_type = ""
             if device['is_system_audio']:
-                device_type = " [系统音频] ⭐"
+                device_type = " [系统音频]" + ("(WASAPI环回)" if device.get('is_loopback') else "")
             elif device['type'] == 'microphone':
                 device_type = " [麦克风]"
             else:
@@ -234,7 +240,7 @@ def list_audio_devices():
             print()
         
         if system_audio_count == 0:
-            print("⚠️  未发现系统音频设备！")
+            print("未发现系统音频设备！")
             print("要捕获系统播放的音频，请：")
             print("1. 运行 'python main.py --setup-system-audio' 获取设置帮助")
             print("2. 启用Windows立体声混音功能")
