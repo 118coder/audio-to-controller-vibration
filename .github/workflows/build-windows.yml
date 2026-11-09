@@ -5,6 +5,9 @@ on:
     branches: [ main ]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: windows-latest
@@ -22,19 +25,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install XInput-Python pyaudio numpy scipy matplotlib psutil pyinstaller
 
-      - name: Build exe with PyInstaller
+      - name: Build windowed exe
         run: |
           pyinstaller --noconfirm --clean --onefile --windowed --name AudioVibration main.py
 
-      - name: Package exe with config
+      - name: Build console exe (diagnostics)
+        run: |
+          pyinstaller --noconfirm --onefile --console --name AudioVibration_console main.py
+
+      - name: Package
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path package | Out-Null
           Copy-Item dist/AudioVibration.exe package/
+          Copy-Item dist/AudioVibration_console.exe package/
           Copy-Item -Recurse -Force config package/
           Copy-Item default_config.json package/
-
           Compress-Archive -Path package/* -DestinationPath AudioVibration_windows.zip -Force
+          Get-ChildItem package | Select-Object Name, Length
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
